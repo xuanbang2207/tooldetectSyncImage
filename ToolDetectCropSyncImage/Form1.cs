@@ -31,6 +31,7 @@ namespace ToolDetectCropSyncImage
         List<string> accountNames = new List<string>();
         List<string> employeeCodes = new List<string>();
         int employeeCodeLength = 0;
+        List<string> columnChecks = new List<string>();
         private void Form1_Load(object sender, EventArgs e)
         {
             rad5Image.Checked = true;
@@ -107,7 +108,10 @@ namespace ToolDetectCropSyncImage
                 // loop through each row and add values to our sheet
                 //create the header of table
                 // add 2 column not in excel
-                dt.Columns.Add("#", typeof(string));
+                //DataGridViewCheckBoxColumn dgvChkboxCol = new DataGridViewCheckBoxColumn();
+                //dgvChkboxCol.ValueType = typeof(bool);
+
+                dt.Columns.Add("Status", typeof(bool));
                 dt.Columns.Add("Row Excel", typeof(Int32));
                 for (int j = 1; j <= columnCount; j++)
                 {
@@ -121,7 +125,7 @@ namespace ToolDetectCropSyncImage
                 {
                     DataRow dr = dt.NewRow();
                     int rowExcel = i;
-                    dr["#"] = "0";
+                    dr["Status"] = true;
                     dr[1] = i;
                     string accountName = Convert.ToString(range.Cells[i, 1].Value2);
                     if (!string.IsNullOrEmpty(accountName))
@@ -173,32 +177,33 @@ namespace ToolDetectCropSyncImage
         private void btnCheck_Click(object sender, EventArgs e)
         {
             CheckedListBox.CheckedItemCollection items = checklbColumn.CheckedItems;
-            List<string> columnChecks = new List<string>();
+            columnChecks.Clear();
             foreach (var item in items)
             {
                 columnChecks.Add(item.ToString());
             }
-            checkValueCell(columnChecks);
-        }
-        private void checkValueCell(List<string> columnChecks)
-        {
             dataGridView1.DataSource = null;
             dataGridView1.DataSource = dataTable;
-            for (int i = 0; i < dataTable.Rows.Count; i++)
+            checkValueCell(columnChecks, dataGridView1);
+        }
+        private void checkValueCell(List<string> columnChecks, DataGridView dataGridView)
+        {
+            //dataGridView1.DataSource = null;
+            //dataGridView1.DataSource = dataTable;
+            for (int i = 0; i < dataGridView.Rows.Count - 1; i++)
             {
-                dataTable.Rows[i]["#"] = "0";
+                dataGridView.Rows[i].Cells["Status"].Value = true;
             }
 
             for (int i = 0; i < dataGridView1.Rows.Count - 1; i++)
             {
-                string name = dataGridView1.Rows[i].Cells[4].Value.ToString();
                 foreach (string columnName in columnChecks)
                 {
                     string value = dataGridView1.Rows[i].Cells[columnName].Value.ToString();
                     if (string.IsNullOrEmpty(value))
                     {
                         dataGridView1.Rows[i].Cells[columnName].Style.BackColor = color_missing;
-                        dataTable.Rows[i]["#"] = "1";
+                        dataGridView1.Rows[i].Cells["Status"].Value = false;
                     }
                 }
             }
@@ -407,10 +412,15 @@ namespace ToolDetectCropSyncImage
                     checklbColumn.Items.Insert(3, "Image 4");
                     dt.Columns.Add("Image 5", typeof(string)).SetOrdinal(4);
                     checklbColumn.Items.Insert(4, "Image 5");
-                    //dataTable.Columns.Count
+                    
                     for (int i = 0; i < dataTable.Columns.Count; i++)
                     {
                         string columnName = dataTable.Columns[i].ColumnName;
+                        if ("Status".Equals(columnName))
+                        {
+                            dt.Columns.Add("Status", typeof(bool));
+                            continue;
+                        }
                         dt.Columns.Add(columnName);
                     }
                     for (int i = 0; i < dataTable.Rows.Count; i++)
@@ -436,11 +446,18 @@ namespace ToolDetectCropSyncImage
                                 row[image] = keyValue.Key;
                             }
                         }
-                        for (int j = 0; j < dataTable.Columns.Count; j++)
+                        bool status = Convert.ToBoolean(dataTable.Rows[i][0]);
+                        row["Status"] = status;
+                        for (int j = 1; j < dataTable.Columns.Count; j++)
                         {
                             string columnName = dataTable.Columns[j].ColumnName;
+                            //if ("Status".Equals(columnName))
+                            //{
+                            //    bool status = Convert.ToBoolean(dataTable.Rows[i][j]);
+                            //    row["Status"] = status;
+                            //}
                             string value = dataTable.Rows[i][j].ToString();
-                            row[j + 5] = value;
+                            row[columnName] = value;
                         }
                         dt.Rows.Add(row);
                     }
@@ -452,44 +469,185 @@ namespace ToolDetectCropSyncImage
 
         private void btnExportExcel_Click(object sender, EventArgs e)
         {
-
+            writeDataGridViewToExcel();
+            //exportDataGridViewToExcel();
         }
 
         private void cbSort_SelectedIndexChanged(object sender, EventArgs e)
         {
             ComboBox cb = sender as ComboBox;
-                System.Data.DataTable dt = dataTable.Clone();
-            for (int i = 0; i < dataTable.Rows.Count; i++)
+            sortDataGridView(cb.SelectedIndex, dataTable);
+        }
+
+        private void sortDataGridView(int index, System.Data.DataTable dTable)
+        {
+            System.Data.DataTable dt = dTable.Clone();
+            dataGridView1.DataSource = null;
+            if (index == 1)
             {
-                if (cb.SelectedIndex == 1 && "0".Equals(dataTable.Rows[i]["#"].ToString()))
+                foreach (DataRow row in dTable.Rows)
                 {
-                    dt.Rows.Add(dataTable.Rows[i]);
-                }
-                if (cb.SelectedIndex == 2 && "1".Equals(dataTable.Rows[i]["#"].ToString()))
-                {
-                    dt.Rows.Add(dataTable.Rows[i]);
-                }
-                if (cb.SelectedIndex == 0 && "1".Equals(dataTable.Rows[i]["#"].ToString()))
-                {
-                    
-                }
-            }
-            if (cb.SelectedIndex == 0)
-            {
-                for (int i = 0; i < dataTable.Rows.Count; i++)
-                {
-                    if ("0".Equals(dataTable.Rows[i]["#"].ToString()))
+                    if (Convert.ToBoolean(row["Status"]))
                     {
-                        dt.Rows.Add(dataTable.Rows[i]);
+                        dt.ImportRow(row);
                     }
                 }
             }
+            if (index == 2)
+            {
+                foreach (DataRow row in dTable.Rows)
+                {
+                    if (!Convert.ToBoolean(row["Status"]))
+                    {
+                        dt.ImportRow(row);
+                    }
+                }
+            }
+            if (index == 0)
+            {
+                foreach (DataRow row in dTable.Rows)
+                {
+                    if (!Convert.ToBoolean(row["Status"]))
+                    {
+                        dt.ImportRow(row);
+                    }
+
+                }
+                foreach (DataRow row in dTable.Rows)
+                {
+                    if (Convert.ToBoolean(row["Status"]))
+                    {
+                        dt.ImportRow(row);
+                    }
+
+                }
+            }
+            dataGridView1.DataSource = null;
             dataGridView1.DataSource = dt;
+            checkValueCell(columnChecks, dataGridView1);
         }
 
-        private void sortDataGridView(System.Data.DataTable dataTable, int index)
+        private void writeDataGridViewToExcel()
         {
-            
+            if (dataGridView1.Rows.Count > 0)
+            {
+                Microsoft.Office.Interop.Excel.Application excelApp = new Microsoft.Office.Interop.Excel.Application();
+                Microsoft.Office.Interop.Excel.Workbook excelworkBook = excelApp.Workbooks.Add(Type.Missing);
+                Microsoft.Office.Interop.Excel.Worksheet excelSheet = null;
+                excelSheet = excelworkBook.Sheets["Sheet1"];
+                excelSheet = excelworkBook.ActiveSheet;
+                excelSheet.Name = "Sheet1";
+
+                int columnAccountName = dataGridView1.Columns["Account_Name"].Index;
+
+                //Excel.Range EmployeeInfo = excelSheet.Range["P1:Q1"];
+                //EmployeeInfo.MergeCells = true;
+                //EmployeeInfo.Value2 = "Employee Info";
+                //EmployeeInfo.HorizontalAlignment = Excel.XlHAlign.xlHAlignCenter;
+
+                for (int i = columnAccountName; i < dataGridView1.Columns.Count; i++)
+                {
+                    if (columnAccountName == 7)
+                    {
+                        string columnName = dataGridView1.Columns[i].HeaderText;
+                        excelSheet.Cells[2, i - 6] = columnName;
+                    }
+                    else if (columnAccountName == 3)
+                    {
+                        string columnName = dataGridView1.Columns[i].HeaderText;
+                        excelSheet.Cells[2, i - 2] = columnName;
+                    }
+
+                }
+                excelSheet.Range["A2:S2"].Font.Bold = true;
+                excelSheet.Range["A2:S2"].Borders.LineStyle = Excel.Constants.xlSolid;
+
+                int rowExcelStart = 3;
+                int rowExcelEnd = rowExcelStart + dataGridView1.Rows.Count - 2;
+                for (int i = 0; i < dataGridView1.Rows.Count - 1; i++)
+                {
+                    for (int j = columnAccountName; j < dataGridView1.Columns.Count; j++)
+                    {
+                        if (columnAccountName == 7)
+                        {
+                            string value = dataGridView1.Rows[i].Cells[j].Value.ToString();
+                            excelSheet.Cells[i + rowExcelStart, columnAccountName - 6] = value;
+                        }
+                        else if (columnAccountName == 3)
+                        {
+                            string value = dataGridView1.Rows[i].Cells[j].Value.ToString();
+                            excelSheet.Cells[i + rowExcelStart, columnAccountName - 2] = value;
+                        }
+                    }
+                }
+                //string num = "0000000000000000000";
+
+                //excelSheet.Range[excelSheet.Cells[rowExcelStart, 17], excelSheet.Cells[rowExcelEnd, 17]].NumberFormat = "dd/MM/yyyy";
+                //excelSheet.Range[excelSheet.Cells[rowExcelStart, 2], excelSheet.Cells[rowExcelEnd, 2]].NumberFormat = num.Substring(0, employeeCodeLength - 1);
+    
+                excelApp.Columns.AutoFit();
+
+                var saveFileDialog = new SaveFileDialog();
+                DateTime now = DateTime.Now;
+                saveFileDialog.FileName = "Staff" + now.ToString("yyyyMMddhhmmss");
+                saveFileDialog.DefaultExt = ".xlsx";
+                if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    excelworkBook.SaveAs(saveFileDialog.FileName, Type.Missing,
+                    Type.Missing, Type.Missing, Type.Missing, Type.Missing, Excel.XlSaveAsAccessMode.xlNoChange,
+                    Type.Missing, Type.Missing, Type.Missing, Type.Missing, Type.Missing);
+                }
+                excelApp.Columns.AutoFit();
+                excelApp.Visible = true;
+                excelApp.Quit();
+            }
         }
+
+
+        public void exportDataGridViewToExcel()
+        {
+            Microsoft.Office.Interop.Excel.Range excelCellrange;
+
+            if (dataGridView1.Rows.Count > 0)
+            {
+                //dataGridView1.SelectAll();
+                Microsoft.Office.Interop.Excel.Application excelApp = new Microsoft.Office.Interop.Excel.Application();
+                Microsoft.Office.Interop.Excel.Workbook excelworkBook = excelApp.Workbooks.Add(Type.Missing);
+                Microsoft.Office.Interop.Excel.Worksheet excelSheet = null;
+                excelSheet = excelworkBook.Sheets["Sheet1"];
+                excelSheet = excelworkBook.ActiveSheet;
+                excelSheet.Name = "Sheet1";
+                for (int i = 1; i < dataGridView1.Columns.Count + 1; i++)
+                {
+                    excelSheet.Cells[1, i] = dataGridView1.Columns[i - 1].HeaderText;
+                }
+
+                for (int i = 0; i < dataGridView1.Rows.Count - 1; i++)
+                {
+                    for (int j = 0; j < dataGridView1.Columns.Count; j++)
+                    {
+                        excelSheet.Cells[i + 2, j + 1] = dataGridView1.Rows[i].Cells[j].Value.ToString();
+                    }
+                }
+                excelSheet.Range["S2:S16"].NumberFormat = "dd/MM/yyyy";
+                excelSheet.Range["D2:D16"].NumberFormat = "@";
+
+                excelApp.Columns.AutoFit();
+
+                var saveFileDialog = new SaveFileDialog();
+                saveFileDialog.FileName = "Staff";
+                saveFileDialog.DefaultExt = ".xlsx";
+                if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    excelworkBook.SaveAs(saveFileDialog.FileName, Type.Missing,
+                    Type.Missing, Type.Missing, Type.Missing, Type.Missing, Excel.XlSaveAsAccessMode.xlNoChange,
+                    Type.Missing, Type.Missing, Type.Missing, Type.Missing, Type.Missing);
+                }
+                excelApp.Columns.AutoFit();
+                excelApp.Visible = true;
+                excelApp.Quit();
+            }
+        }
+
     }
 }
